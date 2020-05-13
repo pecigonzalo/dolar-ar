@@ -4,8 +4,7 @@
 
 This small NodeJS script reads exchange rates from Argentine newspapers and posts them to a Slack webhook.
 
-This version is intended to be hosted serverless in AWS Lambda.
-
+This version is intended to be hosted using Docker.
 
 ## Testing
 
@@ -15,43 +14,14 @@ Required environment variables:
 - `NODE_ENV=production`
 - `STORE_BUCKET=s3-bucket-name`
 - `STORE_KEY=file-name.json`
+- `S3_ENDPOINT=http://minio:9000` (Empty if using S3)
+- `AWS_ACCESS_KEY_ID=minio`
+- `AWS_SECRET_ACCESS_KEY=ABC123abc`
 
-To test it, configure your [AWS credentials](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html) and run as follows:
-
-```
-npm i
-export STORE_BUCKET=s3-bucket-name
-export STORE_KEY=file-name.json
-node index.js
-```
-
-## Publishing
-
-Zip the whole thing in a .zip file and upload it to Lambda. To give permissions to the S3 bucket, you need to edit the IAM role created and add an inline policy like this:
+To test it, run using docker-compose as follows:
 
 ```
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:ListAllMyBuckets",
-                "s3:GetBucketLocation"
-            ],
-            "Resource": "*"
-        },
-        {
-            "Effect": "Allow",
-            "Action": "s3:*",
-            "Resource": [
-                "arn:aws:s3:::s3-bucket-name",
-                "arn:aws:s3:::s3-bucket-name/*"
-            ]
-        }
-    ]
-}
+docker-compose up --build
 ```
-
 
 That's it. Enjoy!
