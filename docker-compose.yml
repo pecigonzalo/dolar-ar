@@ -1,0 +1,30 @@
+version: "3.4"
+
+services:
+  dolar-ar:
+    image: dolar-ar
+    build: .
+    environment:
+      NODE_ENV: dev
+      SLACK_WEBHOOK: https://slack-webhook-url/
+      S3_ENDPOINT: http://minio:9000
+      STORE_BUCKET: dolar-ar
+      STORE_KEY: rate
+      AWS_ACCESS_KEY_ID: minio
+      AWS_SECRET_ACCESS_KEY: ABC123abc
+    links:
+      - "minio"
+
+  minio:
+    image: minio/minio:latest
+    command: server /data
+    ports:
+      - 9000:9000
+    environment:
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: ABC123abc
+    volumes:
+      - minio:/data
+
+volumes:
+  minio:
