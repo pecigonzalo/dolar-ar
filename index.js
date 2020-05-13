@@ -22,12 +22,29 @@ const loadStoredRates = (success, error) => {
   console.log("Loading rates from S3")
   s3.getObject(s3FileInfo, function (err, data) {
     if (err) {
-      console.log("Error. Probably no initial rates found...", err);
-      error()
+      // TODO: handle this a bit better
+      if (err.code === "NoSuchBucket") {
+        console.log("Bucket not found, creating");
+        var bucketParams = {
+          Bucket: s3FileInfo.Bucket
+        };
+        s3.createBucket(bucketParams, function (err, data) {
+          if (err) {
+            console.log("Error", err);
+          } else {
+            console.log("Created: ", data.Location);
+            loadStoredRates();
+          }
+          error();
+        });
+      } else {
+        console.log("Error. Probably no initial rates found...", err);
+        error();
+      }
     } else {
       currentRates = JSON.parse(data.Body.toString())
       console.log("Previous rates found", currentRates);
-      success()
+      success();
     }
   })
 }
