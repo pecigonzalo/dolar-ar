@@ -5,7 +5,7 @@ const SlackWebhook = require('slack-webhook');
 const slack = new SlackWebhook(process.env.SLACK_WEBHOOK || "abc");
 let currentRates = {};
 const tolerance = 0.001;
-const interval = 60 * 1000; // 1 minute
+const interval = process.env.INTERVAL || 60 * 1000; // 1 minute
 const axios = require('axios');
 let s3 = new aws.S3({
   endpoint: process.env.S3_ENDPOINT || '',
