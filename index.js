@@ -5,8 +5,12 @@ const SlackWebhook = require('slack-webhook');
 const slack = new SlackWebhook(process.env.SLACK_WEBHOOK || "abc");
 let currentRates = {};
 const tolerance = 0.001;
+const interval = 60 * 1000; // 1 minute
 const axios = require('axios');
-let s3 = new aws.S3();
+let s3 = new aws.S3({
+  endpoint: process.env.S3_ENDPOINT || '',
+  s3ForcePathStyle: true,
+});
 
 let s3FileInfo = {
   Bucket: process.env.STORE_BUCKET || '',
@@ -35,13 +39,12 @@ const saveRates = (callback) => {
     Key: s3FileInfo.Key,
     Body: JSON.stringify(currentRates),
     ContentType: 'application/json'
-  }, function(error, response) {
+  }, function (error, response) {
     if (error) console.error(error)
     else console.log("Saved rates to S3")
     if (callback) callback();
   })
 }
-
 
 
 const getDiff = (rate, currentRate) => {
@@ -60,17 +63,26 @@ const sendToSlackChannel = (msg) => {
   console.log("Sending message to Slack: " + msg)
   if (process.env.NODE_ENV === 'production') {
     slack.send(msg);
+  } else {
+    console.log(msg)
   }
 }
 
-const mapRates = _rates => 
+const mapRates = _rates =>
   _rates.reduce((rates, rate) => {
-    const { compra, venta } = rate
-    rates[rate.key] = { compra, venta }
+    const {
+      compra,
+      venta
+    } = rate
+    rates[rate.key] = {
+      compra,
+      venta
+    }
     return rates
   }, {})
 
 const updateRate = (rates) => {
+  console.log("Updating Rates");
   let areAnyChanges = false
   rates.forEach(rate => {
     const currentRate = currentRates[rate.key]
@@ -84,7 +96,9 @@ const updateRate = (rates) => {
   })
   currentRates = mapRates(rates)
 
-  if (areAnyChanges) return new Promise(function(success) { saveRates(success); }) 
+  if (areAnyChanges) return new Promise(function (success) {
+    saveRates(success);
+  })
   else console.log("All rates are the same. S3 not updated. No messages sent to Slack")
 }
 
@@ -96,7 +110,10 @@ const getCronistaBNRate = url =>
   }).then(response => {
     const compra = +response.data.dolarbna.valorcompra
     const venta = +response.data.dolarbna.valorventa
-    return { compra, venta }
+    return {
+      compra,
+      venta
+    }
   })
 
 const getCronistaBalanzRate = () =>
@@ -106,10 +123,13 @@ const getCronistaBalanzRate = () =>
   }).then(response => {
     const compra = +response.data.Cotizacion.PrecioCompra
     const venta = +response.data.Cotizacion.PrecioVenta
-    return { compra, venta }
+    return {
+      compra,
+      venta
+    }
   })
-  
-const getCronistaBlueRate = () => 
+
+const getCronistaBlueRate = () =>
   axios({
     url: "https://www.cronista.com/MercadosOnline/json/getValoresCalculadora.html",
     method: 'get'
@@ -117,55 +137,62 @@ const getCronistaBlueRate = () =>
     const blue = response.data.find(item => item.Id === 2)
     const compra = +blue.Compra
     const venta = +blue.Venta
-    return { compra, venta }
+    return {
+      compra,
+      venta
+    }
   })
-    
-const rateMap = [{
-    key: "bna",
-    name: "BNA",
-    resolver: getCronistaBNRate
-  },{
-    key: "balanz",
-    name: "Balanz",
-    resolver: getCronistaBalanzRate
-  },{
-    key: "blue",
-    name: "Blue",
-    resolver: getCronistaBlueRate
-  }]
 
-const getRates = () => 
+const rateMap = [{
+  key: "bna",
+  name: "BNA",
+  resolver: getCronistaBNRate
+}, {
+  key: "balanz",
+  name: "Balanz",
+  resolver: getCronistaBalanzRate
+}, {
+  key: "blue",
+  name: "Blue",
+  resolver: getCronistaBlueRate
+}]
+
+const getRates = () =>
   Promise.all(rateMap.map(
-    r => r.resolver().then(rate => ({...rate, key: r.key, name: r.name}))
+    r => r.resolver().then(rate => ({
+      ...rate,
+      key: r.key,
+      name: r.name
+    }))
   ))
 
 const setInitialRate = () => {
   return getRates()
-        .then(rates => {
-          currentRates = mapRates(rates)
-          console.log("Inital rates", currentRates)
-          return new Promise(function(success) {
-            saveRates(success)
-          })
-        })
+    .then(rates => {
+      currentRates = mapRates(rates)
+      console.log("Inital rates", currentRates);
+      return new Promise(function (success) {
+        saveRates(success)
+      })
+    })
 }
 
-const doIt = (event) => {
-  let promise = new Promise(function(complete, failed) {
+const loop = () => {
+  let promise = new Promise(function (complete, failed) {
     loadStoredRates(() => {
-      // Initial rates loaded
-      getRates().then(updateRate).then(complete)
-    },
-    () => {
-      // No initial rates
-      setInitialRate().then(complete)
-    })
+        console.log("Initial rates loaded");
+        getRates().then(updateRate);
+      },
+      () => {
+        console.log("No initial rates");
+        setInitialRate();
+      })
   })
   return promise
-};
-
-exports.handler = async () => doIt()
-
-if (process.env.NODE_ENV !== 'production') {
-  doIt()
 }
+
+console.log("Starting Interval Loop");
+loop();
+setInterval(() => {
+  loop()
+}, interval);
