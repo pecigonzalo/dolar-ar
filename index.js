@@ -1,79 +1,14 @@
-const pino = require("pino");
-const logger = pino({
-  prettyPrint: {
-    translateTime: true,
-    colorize: true,
-    ignore: "pid,hostname",
-  },
-});
-const aws = require("aws-sdk");
-const env = require("dotenv").config();
 const SlackWebhook = require("slack-webhook");
 const axios = require("axios");
 
-const slack = new SlackWebhook(process.env.SLACK_WEBHOOK || "abc");
-const tolerance = 0.001;
-const interval = process.env.INTERVAL || 60 * 1000; // 1 minute
-const s3 = new aws.S3({
-  endpoint: process.env.S3_ENDPOINT || "",
-  s3ForcePathStyle: true,
-});
+const logger = require('./logger')
+const { loadStoredRates, saveRates } = require('./storage')
 
-const s3FileInfo = {
-  Bucket: process.env.STORE_BUCKET || "",
-  Key: process.env.STORE_KEY || "",
-};
+const slack = new SlackWebhook(process.env.SLACK_WEBHOOK || "abc");
+const tolerance = 0.01;
+const interval = process.env.INTERVAL || 60 * 1000; // 1 minute
 
 let currentRates = {};
-
-// S3 Functions
-const loadStoredRates = (success, error) => {
-  logger.info("Loading rates from S3");
-  s3.getObject(s3FileInfo, function (err, data) {
-    if (err) {
-      // TODO: handle this a bit better
-      if (err.code === "NoSuchBucket") {
-        logger.warn("Bucket not found, creating");
-        let bucketParams = {
-          Bucket: s3FileInfo.Bucket,
-        };
-        s3.createBucket(bucketParams, function (err, data) {
-          if (err) {
-            logger.error("Error", err);
-          } else {
-            logger.info("Created: ", data.Location);
-            loadStoredRates();
-          }
-          error();
-        });
-      } else {
-        logger.error("Error. Probably no initial rates found...", err);
-        error();
-      }
-    } else {
-      currentRates = JSON.parse(data.Body.toString());
-      logger.info("Previous rates found", currentRates);
-      success();
-    }
-  });
-};
-
-const saveRates = (callback) => {
-  logger.info("Saving rates to S3", currentRates);
-  s3.putObject(
-    {
-      Bucket: s3FileInfo.Bucket,
-      Key: s3FileInfo.Key,
-      Body: JSON.stringify(currentRates),
-      ContentType: "application/json",
-    },
-    function (error, response) {
-      if (error) console.error(error);
-      else logger.info("Saved rates to S3");
-      if (callback) callback();
-    }
-  );
-};
 
 const getDiff = (rate, currentRate) => {
   return rate / currentRate - 1;
@@ -121,7 +56,7 @@ const updateRate = (rates) => {
 
   if (areAnyChanges)
     return new Promise(function (success) {
-      saveRates(success);
+      saveRates(currentRates, success);
     });
   else
     logger.info(
@@ -129,82 +64,48 @@ const updateRate = (rates) => {
     );
 };
 
-const getCronistaBNRate = (url) =>
-  axios({
-    url: "https://www.cronista.com/MercadosOnline/json/eccheader.json",
-    method: "get",
-  }).then((response) => {
-    const compra = +response.data.dolarbna.valorcompra;
-    const venta = +response.data.dolarbna.valorventa;
-    return {
-      compra,
-      venta,
-    };
-  });
-
-const getCronistaBalanzRate = () =>
-  axios({
-    url: "https://www.cronista.com/_static_rankings/static_dolarbalanz.html",
-    method: "get",
-  }).then((response) => {
-    const compra = +response.data.Cotizacion.PrecioCompra;
-    const venta = +response.data.Cotizacion.PrecioVenta;
-    return {
-      compra,
-      venta,
-    };
-  });
-
-const getCronistaBlueRate = () =>
-  axios({
-    url:
-      "https://www.cronista.com/MercadosOnline/json/getValoresCalculadora.html",
-    method: "get",
-  }).then((response) => {
-    const blue = response.data.find((item) => item.Id === 2);
-    const compra = +blue.Compra;
-    const venta = +blue.Venta;
-    return {
-      compra,
-      venta,
-    };
-  });
-
 const rateMap = [
   {
     key: "bna",
     name: "BNA",
-    resolver: getCronistaBNRate,
-  },
-  {
-    key: "balanz",
-    name: "Balanz",
-    resolver: getCronistaBalanzRate,
+    id: 1,
   },
   {
     key: "blue",
     name: "Blue",
-    resolver: getCronistaBlueRate,
+    id: 2,
+  },
+  {
+    key: "contado_c_liqui",
+    name: "Contado c/Liqui",
+    id: 5,
   },
 ];
 
 const getRates = () =>
-  Promise.all(
-    rateMap.map((r) =>
-      r.resolver().then((rate) => ({
-        ...rate,
-        key: r.key,
-        name: r.name,
-      }))
-    )
-  );
+  axios({
+    url:
+      "https://www.cronista.com/MercadosOnline/json/getValoresCalculadora.html",
+    method: "get",
+  }).then(response => {
+    return rateMap.map((r) => {
+      const cotizacion = response.data.find((item) => item.Id === r.id);
+      const compra = +cotizacion.Compra;
+      const venta = +cotizacion.Venta;
+      return {
+        ...r,
+        compra,
+        venta
+      };
+    })
+  })
 
 const setInitialRate = () => {
   return getRates().then((rates) => {
     currentRates = mapRates(rates);
-    logger.info("Inital rates", currentRates);
+    logger.info("Initial rates", currentRates);
     return new Promise(function (success) {
-      saveRates(success);
+      saveRates(currentRates, success);
     });
   });
 };
@@ -212,7 +113,8 @@ const setInitialRate = () => {
 const loop = () => {
   let promise = new Promise(function (complete, failed) {
     loadStoredRates(
-      () => {
+      (loadedRates) => {
+        currentRates = loadedRates
         logger.info("Loaded initial rates");
         getRates().then(updateRate);
       },
