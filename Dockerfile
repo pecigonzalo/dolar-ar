@@ -9,6 +9,7 @@ COPY ["package.json", "yarn.lock", "./"]
 
 RUN yarn install --production
 
-COPY index.js .
+COPY src/ ./src
+COPY index.js ./
 
 CMD yarn start

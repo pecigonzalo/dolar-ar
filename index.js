@@ -1,8 +1,8 @@
 const SlackWebhook = require("slack-webhook");
 const axios = require("axios");
 
-const logger = require('./logger')
-const { loadStoredRates, saveRates } = require('./storage')
+const logger = require("./src/logger");
+const { loadStoredRates, saveRates } = require("./src/storage");
 
 const slack = new SlackWebhook(process.env.SLACK_WEBHOOK || "abc");
 const tolerance = 0.01;
@@ -87,7 +87,7 @@ const getRates = () =>
     url:
       "https://www.cronista.com/MercadosOnline/json/getValoresCalculadora.html",
     method: "get",
-  }).then(response => {
+  }).then((response) => {
     return rateMap.map((r) => {
       const cotizacion = response.data.find((item) => item.Id === r.id);
       const compra = +cotizacion.Compra;
@@ -95,10 +95,10 @@ const getRates = () =>
       return {
         ...r,
         compra,
-        venta
+        venta,
       };
-    })
-  })
+    });
+  });
 
 const setInitialRate = () => {
   return getRates().then((rates) => {
@@ -114,7 +114,7 @@ const loop = () => {
   let promise = new Promise(function (complete, failed) {
     loadStoredRates(
       (loadedRates) => {
-        currentRates = loadedRates
+        currentRates = loadedRates;
         logger.info("Loaded initial rates");
         getRates().then(updateRate);
       },
