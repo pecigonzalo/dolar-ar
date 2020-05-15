@@ -5,7 +5,7 @@ const s3 = new aws.S3({
 });
 const fs = require("fs");
 
-const logger = require('./logger');
+const logger = require("./logger");
 
 const s3FileInfo = {
   Bucket: process.env.STORE_BUCKET || "",
@@ -14,8 +14,8 @@ const s3FileInfo = {
 
 // S3 Functions
 const loadStoredRates = (success, error) => {
-  if (process.env.NODE_ENV !== "production") {
-    return loadStoredRatesLocal(success, error)
+  if (process.env.BACKEND !== "s3") {
+    return loadStoredRatesLocal(success, error);
   }
 
   logger.info("Loading rates from S3");
@@ -50,18 +50,18 @@ const loadStoredRates = (success, error) => {
 
 const loadStoredRatesLocal = (success, error) => {
   logger.info("Loading rates from file");
-  fs.readFile(s3FileInfo.Key, function(err, data) {
-    if(err) return error(err);
+  fs.readFile(s3FileInfo.Key, function (err, data) {
+    if (err) return error(err);
     logger.info("Read from file", JSON.parse(data.toString()));
     const loadedRates = JSON.parse(data.toString());
-      logger.info("Previous rates found", loadedRates);
-      success(loadedRates);
-  })
-}
+    logger.info("Previous rates found", loadedRates);
+    success(loadedRates);
+  });
+};
 
 const saveRates = (currentRates, callback) => {
-  if (process.env.NODE_ENV !== "production") {
-    return saveRatesLocal(currentRates, callback)
+  if (process.env.BACKEND !== "s3") {
+    return saveRatesLocal(currentRates, callback);
   }
 
   logger.info("Saving rates to S3", currentRates);
@@ -86,9 +86,9 @@ const saveRatesLocal = (currentRates, callback) => {
     if (err) return console.error(err);
     if (callback) callback();
   });
-}
+};
 
 module.exports = {
   loadStoredRates,
-  saveRates
-}
+  saveRates,
+};
