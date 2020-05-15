@@ -47,8 +47,8 @@ const updateRate = (rates) => {
     if (Math.abs(diffventa) >= tolerance || Math.abs(diffcompra) >= tolerance) {
       areAnyChanges = true;
       const msg = `*${rate.name}:* Compra: ${getIcon(diffcompra)} 1 USD = *${
-        rate.compra
-      } ARS* - Venta: ${getIcon(diffventa)} 1 USD = *${rate.venta} ARS*`;
+        rate.compra.toFixed(2)
+      } ARS* - Venta: ${getIcon(diffventa)} 1 USD = *${rate.venta.toFixed(2)} ARS*`;
       sendToSlackChannel(msg);
     }
   });
