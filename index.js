@@ -5,7 +5,7 @@ const logger = require("./src/logger");
 const { loadStoredRates, saveRates } = require("./src/storage");
 
 const slack = new SlackWebhook(process.env.SLACK_WEBHOOK || "abc");
-const tolerance = 0.01;
+const tolerance = 0.03;
 const interval = process.env.INTERVAL || 60 * 1000; // 1 minute
 
 let currentRates = {};
@@ -46,9 +46,11 @@ const updateRate = (rates) => {
     const diffcompra = getDiff(rate.compra, currentRate.compra);
     if (Math.abs(diffventa) >= tolerance || Math.abs(diffcompra) >= tolerance) {
       areAnyChanges = true;
-      const msg = `*${rate.name}:* Compra: ${getIcon(diffcompra)} 1 USD = *${
-        rate.compra.toFixed(2)
-      } ARS* - Venta: ${getIcon(diffventa)} 1 USD = *${rate.venta.toFixed(2)} ARS*`;
+      const msg = `*${rate.name}:* Compra: ${getIcon(
+        diffcompra
+      )} 1 USD = *${rate.compra.toFixed(2)} ARS* - Venta: ${getIcon(
+        diffventa
+      )} 1 USD = *${rate.venta.toFixed(2)} ARS*`;
       sendToSlackChannel(msg);
     }
   });
