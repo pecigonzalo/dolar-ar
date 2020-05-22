@@ -77,11 +77,6 @@ const rateMap = [
     name: "Blue",
     id: 2,
   },
-  {
-    key: "contado_c_liqui",
-    name: "Contado c/Liqui",
-    id: 5,
-  },
 ];
 
 const getRates = () =>
