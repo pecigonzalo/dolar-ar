@@ -44,6 +44,11 @@ const updateRate = (rates) => {
     const currentRate = currentRates[rate.key];
     const diffventa = getDiff(rate.venta, currentRate.venta);
     const diffcompra = getDiff(rate.compra, currentRate.compra);
+    logger.info(
+      `Diff for ${rate.name} ` +
+        `(compra: ${JSON.stringify(diffcompra)} ` +
+        `venta: ${JSON.stringify(diffventa)})`
+    );
     if (Math.abs(diffventa) >= tolerance || Math.abs(diffcompra) >= tolerance) {
       areAnyChanges = true;
       const msg = `*${rate.name}:* Compra: ${getIcon(
@@ -52,19 +57,21 @@ const updateRate = (rates) => {
         diffventa
       )} 1 USD = *${rate.venta.toFixed(2)} ARS*`;
       sendToSlackChannel(msg);
+    } else {
+      logger.info(
+        `All rates are the same for ${rate.name}. No messages sent to Slack`
+      );
+      logger.info(JSON.stringify(rate));
     }
   });
   currentRates = mapRates(rates);
 
-  if (areAnyChanges)
+  if (areAnyChanges) {
+    logger.info("Saving rates.");
     return new Promise(function (success) {
       saveRates(currentRates, success);
     });
-  else
-    logger.info(
-      "All rates are the same. S3 not updated. No messages sent to Slack",
-      currentRates
-    );
+  }
 };
 
 const rateMap = [
