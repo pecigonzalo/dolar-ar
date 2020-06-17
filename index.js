@@ -62,7 +62,8 @@ const updateRate = (rates) => {
     });
   else
     logger.info(
-      "All rates are the same. S3 not updated. No messages sent to Slack"
+      "All rates are the same. S3 not updated. No messages sent to Slack",
+      currentRates
     );
 };
 
